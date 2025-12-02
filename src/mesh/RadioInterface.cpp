@@ -271,13 +271,34 @@ uint32_t RadioInterface::getTxDelayMsec()
 /** The CW size to use when calculating SNR_based delays */
 uint8_t RadioInterface::getCWsize(float snr)
 {
-    // The minimum value for a LoRa SNR
+    // SNR Limits
     const int32_t SNR_MIN = -20;
-
-    // The maximum value for a LoRa SNR
     const int32_t SNR_MAX = 10;
+    
+    // CW Anchor Points
+    const uint8_t CW_AT_ZERO = 6; // CW value when SNR is 0 (pivot point)
 
-    return map(snr, SNR_MIN, SNR_MAX, CWmin, CWmax);
+    // --- PART 1: ABOVE ZERO (Linear) ---
+    if (snr >= 0) {
+        // Map from 0 to 10 -> CW from 6 to 8
+        // Linear mapping for positive signal
+        float t = constrain(snr / (float)SNR_MAX, 0.0f, 1.0f);
+        return CW_AT_ZERO + (uint8_t)(t * (CWmax - CW_AT_ZERO));
+    }
+    
+    // --- PART 2: BELOW ZERO (Rapid Drop) ---
+    else {
+        // Map from -20 to 0 -> CW from 3 to 6
+        // Use a Cubic curve to drop quickly as soon as it goes below zero
+        float range = (float)(0 - SNR_MIN); // range is 20
+        float offset = (snr - SNR_MIN);     // offset from -20
+        
+        // Normalize t between 0.0 and 1.0
+        float t = constrain(offset / range, 0.0f, 1.0f);
+        
+        // t*t*t creates a steep curve (as soon as t drops below 1.0, the value collapses)
+        return CWmin + (uint8_t)(t * t * t * (CW_AT_ZERO - CWmin));
+    }
 }
 
 /** The worst-case SNR_based packet delay */
