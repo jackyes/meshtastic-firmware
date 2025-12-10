@@ -169,7 +169,7 @@ bool Router::shouldForwardPacket(const meshtastic_MeshPacket *p)
         return false;
     }
     
-    // Conservative mode: 20-50% battery
+    // Conservative mode: 20-35% battery
     if (batteryLevel < BATTERY_MEDIUM_THRESHOLD) {
         // Forward critical packets
         if (isCriticalPacket(p)) {
@@ -191,7 +191,7 @@ bool Router::shouldForwardPacket(const meshtastic_MeshPacket *p)
         return true;
     }
     
-    // Normal mode: > 50% battery - allow all traffic
+    // Normal mode: > 35% battery - allow all traffic
     return true;
 }
 
