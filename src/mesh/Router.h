@@ -114,6 +114,8 @@ class Router : protected concurrency::OSThread, protected PacketHistory
      */
     bool isCriticalPacket(const meshtastic_MeshPacket *p);
 
+    // pointer to the encrypted packet
+    meshtastic_MeshPacket *p_encrypted = nullptr;
   protected:
     friend class RoutingModule;
 
