@@ -481,6 +481,13 @@ void cpuDeepSleep(uint32_t msecToWake)
             ;
 #endif
 
+        // Enable RAM retention for all RAM blocks (valid for nRF52840)
+        // This is required to preserve the .noinit section (solar hysteresis state)
+        for (int i = 0; i <= 8; i++) {
+             NRF_POWER->RAM[i].POWERSET = (POWER_RAM_POWER_S0RETENTION_On << POWER_RAM_POWER_S0RETENTION_Pos) |
+                                          (POWER_RAM_POWER_S1RETENTION_On << POWER_RAM_POWER_S1RETENTION_Pos);
+        }
+
         auto ok = sd_power_system_off();
         if (ok != NRF_SUCCESS) {
             LOG_ERROR("FIXME: Ignoring soft device (EasyDMA pending?) and forcing system-off!");
