@@ -704,37 +704,43 @@ void MQTT::publishQueuedMessages()
     if (!moduleConfig.mqtt.proxy_to_client_enabled && !isConnected)
         return;
 
-    LOG_DEBUG("Publish enqueued MQTT message");
-    const std::unique_ptr<QueueEntry> entry(mqttQueue.dequeuePtr(0));
-    LOG_INFO("publish %s, %u bytes from queue", entry->topic.c_str(), entry->envBytes.size());
-    publish(entry->topic.c_str(), entry->envBytes.data(), entry->envBytes.size(), false);
+    // Respect RF priority delay: don't publish until enough time has passed since last enqueue
+    if (millis() < mqttNextPublishMsec)
+        return;
+
+    QueueEntry *rawEntry;
+    while ((rawEntry = mqttQueue.dequeuePtr(0)) != nullptr) {
+        const std::unique_ptr<QueueEntry> entry(rawEntry);
+        LOG_INFO("publish %s, %u bytes from queue", entry->topic.c_str(), entry->envBytes.size());
+        publish(entry->topic.c_str(), entry->envBytes.data(), entry->envBytes.size(), false);
 
 #if !defined(ARCH_NRF52) ||                                                                                                      \
     defined(NRF52_USE_JSON) // JSON is not supported on nRF52, see issue #2804 ### Fixed by using ArduinoJson ###
-    if (!moduleConfig.mqtt.json_enabled)
-        return;
+        if (!moduleConfig.mqtt.json_enabled)
+            continue;
 
-    // handle json topic
-    const DecodedServiceEnvelope env(entry->envBytes.data(), entry->envBytes.size());
-    if (!env.validDecode || env.packet == NULL || env.channel_id == NULL)
-        return;
+        // handle json topic
+        const DecodedServiceEnvelope env(entry->envBytes.data(), entry->envBytes.size());
+        if (!env.validDecode || env.packet == NULL || env.channel_id == NULL)
+            continue;
 
-    auto jsonString = MeshPacketSerializer::JsonSerialize(env.packet);
-    if (jsonString.length() == 0)
-        return;
+        auto jsonString = MeshPacketSerializer::JsonSerialize(env.packet);
+        if (jsonString.length() == 0)
+            continue;
 
-    // Generate node ID from nodenum for topic
-    std::string nodeId = nodeDB->getNodeId();
+        // Generate node ID from nodenum for topic
+        std::string nodeId = nodeDB->getNodeId();
 
-    std::string topicJson;
-    if (env.packet->pki_encrypted) {
-        topicJson = jsonTopic + "PKI/" + nodeId;
-    } else {
-        topicJson = jsonTopic + env.channel_id + "/" + nodeId;
-    }
-    LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
-    publish(topicJson.c_str(), jsonString.c_str(), false);
+        std::string topicJson;
+        if (env.packet->pki_encrypted) {
+            topicJson = jsonTopic + "PKI/" + nodeId;
+        } else {
+            topicJson = jsonTopic + env.channel_id + "/" + nodeId;
+        }
+        LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
+        publish(topicJson.c_str(), jsonString.c_str(), false);
 #endif // ARCH_NRF52 NRF52_USE_JSON
+    }
 }
 
 void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_MeshPacket &mp_decoded, ChannelIndex chIndex)
@@ -795,39 +801,23 @@ void MQTT::onSend(const meshtastic_MeshPacket &mp_encrypted, const meshtastic_Me
     size_t numBytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_ServiceEnvelope_msg, &env);
     std::string topic = cryptTopic + channelId + "/" + nodeId;
 
-    if (moduleConfig.mqtt.proxy_to_client_enabled || this->isConnectedDirectly()) {
-        LOG_DEBUG("MQTT Publish %s, %u bytes", topic.c_str(), numBytes);
-        publish(topic.c_str(), bytes, numBytes, false);
-
-#if !defined(ARCH_NRF52) ||                                                                                                      \
-    defined(NRF52_USE_JSON) // JSON is not supported on nRF52, see issue #2804 ### Fixed by using ArduinoJson ###
-        if (!moduleConfig.mqtt.json_enabled)
-            return;
-        // handle json topic
-        auto jsonString = MeshPacketSerializer::JsonSerialize(&mp_decoded);
-        if (jsonString.length() == 0)
-            return;
-        // Generate node ID from nodenum for JSON topic
-        std::string nodeIdForJson = nodeDB->getNodeId();
-        std::string topicJson = jsonTopic + channelId + "/" + nodeIdForJson;
-        LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
-        publish(topicJson.c_str(), jsonString.c_str(), false);
-#endif // ARCH_NRF52 NRF52_USE_JSON
+    // Always enqueue: publish is handled asynchronously by publishQueuedMessages() to avoid blocking the RF thread
+    LOG_DEBUG("MQTT onSend - Enqueue %s, %u bytes", topic.c_str(), numBytes);
+    QueueEntry *entry;
+    if (mqttQueue.numFree() == 0) {
+        LOG_WARN("MQTT queue is full, discard oldest");
+        entry = mqttQueue.dequeuePtr(0);
     } else {
-        LOG_INFO("MQTT not connected, queue packet");
-        QueueEntry *entry;
-        if (mqttQueue.numFree() == 0) {
-            LOG_WARN("MQTT queue is full, discard oldest");
-            entry = mqttQueue.dequeuePtr(0);
-        } else {
-            entry = new QueueEntry;
-        }
-        entry->topic = std::move(topic);
-        entry->envBytes.assign(bytes, numBytes);
-        if (mqttQueue.enqueue(entry, 0) == false) {
-            LOG_CRIT("Failed to add a message to mqttQueue!");
-            abort();
-        }
+        entry = new QueueEntry;
+    }
+    entry->enqueuedAtMsec = millis();
+    entry->topic = std::move(topic);
+    entry->envBytes.assign(bytes, numBytes);
+    // Delay drain to give RF path priority over MQTT publish
+    mqttNextPublishMsec = millis() + MQTT_RF_PRIORITY_DELAY_MS;
+    if (mqttQueue.enqueue(entry, 0) == false) {
+        LOG_CRIT("Failed to add a message to mqttQueue!");
+        abort();
     }
 }
 

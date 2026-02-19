@@ -25,6 +25,7 @@
 #endif
 
 #define MAX_MQTT_QUEUE 16
+#define MQTT_RF_PRIORITY_DELAY_MS 200 // ms to wait after last enqueue before publishing, to give RF path priority
 
 /**
  * Our wrapper/singleton for sending/receiving MQTT "udp" packets.  This object isolates the MQTT protocol implementation from
@@ -68,8 +69,10 @@ class MQTT : private concurrency::OSThread
     struct QueueEntry {
         std::string topic;
         std::basic_string<uint8_t> envBytes; // binary/pb_encode_to_bytes ServiceEnvelope
+        uint32_t enqueuedAtMsec = 0;         // timestamp when this entry was enqueued
     };
     PointerQueue<QueueEntry> mqttQueue;
+    uint32_t mqttNextPublishMsec = 0; // earliest time to drain mqttQueue (RF priority delay)
 
     int reconnectCount = 0;
     bool isConfiguredForDefaultServer = true;
