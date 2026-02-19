@@ -84,6 +84,11 @@ bool Router::shouldDecrementHopLimit(const meshtastic_MeshPacket *p)
         return true; // Always decrement on first hop
     }
 
+    // If relay_node is 0 there is no relay info; decrement as usual
+    if (p->relay_node == 0) {
+        return true;
+    }
+
     // For subsequent hops, check the previous relay node
     for (size_t i = 0; i < nodeDB->getNumMeshNodes(); i++) {
         meshtastic_NodeInfoLite *node = nodeDB->getMeshNodeByIndex(i);

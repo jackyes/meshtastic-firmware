@@ -603,18 +603,18 @@ uint8_t RadioInterface::getCWsize(float snr)
         return CW_AT_ZERO + (uint8_t)(t * (CWmax - CW_AT_ZERO));
     }
     
-    // --- PART 2: BELOW ZERO (Rapid Drop) ---
+    // --- PART 2: BELOW ZERO (Linear) ---
     else {
         // Map from -20 to 0 -> CW from 3 to 6
-        // Use a Cubic curve to drop quickly as soon as it goes below zero
+        // Use a linear curve to spread nodes across the full SNR range below zero,
+        // giving better temporal separation between nodes at different signal levels.
         float range = (float)(0 - SNR_MIN); // range is 20
         float offset = (snr - SNR_MIN);     // offset from -20
-        
+
         // Normalize t between 0.0 and 1.0
         float t = constrain(offset / range, 0.0f, 1.0f);
-        
-        // t*t*t creates a steep curve (as soon as t drops below 1.0, the value collapses)
-        return CWmin + (uint8_t)(t * t * t * (CW_AT_ZERO - CWmin));
+
+        return CWmin + (uint8_t)(t * (CW_AT_ZERO - CWmin));
     }
 }
 
