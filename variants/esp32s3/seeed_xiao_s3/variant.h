@@ -63,6 +63,14 @@ L76K GPS Module Information : https://www.seeedstudio.com/L76K-GNSS-Module-for-S
 #define I2C_SDA 5
 #define I2C_SCL 6
 
+// Enable Traffic Management Module for XIAO-S3
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#endif
+
 // XIAO S3 LORA module
 #define USE_SX1262
 

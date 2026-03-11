@@ -11,6 +11,14 @@
 #define LED_STATE_ON 0 // State when LED is lit
 #define LED_POWER 4    // Newer tbeams (1.1) have an extra led on GPIO4
 
+// Enable Traffic Management Module for tbeam
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#endif
+
 // TTGO uses a common pinout for their SX1262 vs RF95 modules - both can be enabled and we will probe at runtime for RF95 and if
 // not found then probe for SX1262
 #define USE_RF95 // RFM95/SX127x
