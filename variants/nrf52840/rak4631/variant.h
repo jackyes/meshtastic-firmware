@@ -27,6 +27,15 @@
 #define USE_LFXO // Board uses 32khz crystal for LF
 // define USE_LFRC    // Board uses RC for LF
 
+
+// Enable Traffic Management Module for RAK4631
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 1024
+#endif
+
 /*----------------------------------------------------------------------------
  *        Headers
  *----------------------------------------------------------------------------*/

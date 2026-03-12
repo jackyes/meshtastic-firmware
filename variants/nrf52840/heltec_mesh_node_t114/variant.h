@@ -23,6 +23,14 @@
 
 #define USE_LFXO // Board uses 32khz crystal for LF
 
+// Enable Traffic Management Module for heltec_mesh_node_t114
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#endif
+
 /*----------------------------------------------------------------------------
  *        Headers
  *----------------------------------------------------------------------------*/

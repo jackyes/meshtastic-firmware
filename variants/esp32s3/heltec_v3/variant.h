@@ -6,6 +6,14 @@
 #define I2C_SDA SDA_OLED // I2C pins for this board
 #define I2C_SCL SCL_OLED
 
+// Enable Traffic Management Module for heltecv3
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#endif
+
 // Enable secondary bus for external periherals
 #define I2C_SDA1 SDA
 #define I2C_SCL1 SCL

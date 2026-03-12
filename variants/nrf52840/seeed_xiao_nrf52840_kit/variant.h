@@ -100,6 +100,14 @@ static const uint8_t A5 = PIN_A5;
 #define PIN_LED2 LED_BLUE
 #define PIN_LED3 LED_RED
 
+// Enable Traffic Management Module for xiao_nrf
+#ifndef HAS_TRAFFIC_MANAGEMENT
+#define HAS_TRAFFIC_MANAGEMENT 1
+#endif
+#ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#endif
+
 /*
  * Buttons
  */
