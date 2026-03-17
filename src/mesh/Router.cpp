@@ -88,8 +88,13 @@ bool Router::shouldDecrementHopLimit(const meshtastic_MeshPacket *p)
         return true; // Always decrement on first hop
     }
 
-    // If relay_node is 0 there is no relay info; decrement as usual
-    if (p->relay_node == 0) {
+    // Check if both local device and previous relay are routers (including CLIENT_BASE)
+    bool localIsRouter =
+        IS_ONE_OF(config.device.role, meshtastic_Config_DeviceConfig_Role_ROUTER, meshtastic_Config_DeviceConfig_Role_ROUTER_LATE,
+                  meshtastic_Config_DeviceConfig_Role_CLIENT_BASE);
+
+    // If local device isn't a router, always decrement
+    if (!localIsRouter) {
         return true;
     }
 
@@ -115,22 +120,29 @@ bool Router::shouldDecrementHopLimit(const meshtastic_MeshPacket *p)
         if (!node)
             continue;
 
-        // Check if this node is the relay_node
+        // Check 1: is_favorite (cheapest - single bool)
+        if (!node->is_favorite)
+            continue;
+
+        // Check 2: has_user (cheap - single bool)
+        if (!node->has_user)
+            continue;
+
+        // Check 3: role check (moderate cost - multiple comparisons)
+        if (!IS_ONE_OF(node->user.role, meshtastic_Config_DeviceConfig_Role_ROUTER,
+                       meshtastic_Config_DeviceConfig_Role_ROUTER_LATE, meshtastic_Config_DeviceConfig_Role_CLIENT_BASE)) {
+            continue;
+        }
+
+        // Check 4: last byte extraction and comparison (most expensive)
         if (nodeDB->getLastByteOfNodeNum(node->num) == p->relay_node) {
-            // If the relay_node is a ROUTER, ROUTER_LATE, CLIENT_BASE, or a favorite node, do not decrement hop_limit
-            if (node->is_favorite ||
-                (node->has_user && IS_ONE_OF(node->user.role, meshtastic_Config_DeviceConfig_Role_ROUTER,
-                                             meshtastic_Config_DeviceConfig_Role_ROUTER_LATE,
-                                             meshtastic_Config_DeviceConfig_Role_CLIENT_BASE))) {
-                LOG_DEBUG("Packet from router/favorite 0x%x, not decrementing hop limit", node->num);
-                return false; // Don't decrement hop_limit
-            }
-            // Found the relay node, no need to check further
-            break;
+            // Found a favorite router match
+            LOG_DEBUG("Identified favorite relay router 0x%x from last byte 0x%x", node->num, p->relay_node);
+            return false; // Don't decrement hop_limit
         }
     }
 
-    // No matching condition found, decrement hop_limit
+    // No favorite router match found, decrement hop_limit
     return true;
 }
 
