@@ -921,6 +921,23 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.ambient_lighting.green = (myNodeInfo.my_node_num & 0x00FF00) >> 8;
     moduleConfig.ambient_lighting.blue = myNodeInfo.my_node_num & 0x0000FF;
 
+#if HAS_TRAFFIC_MANAGEMENT && !MESHTASTIC_EXCLUDE_TRAFFIC_MANAGEMENT
+    moduleConfig.has_traffic_management = true;
+    moduleConfig.traffic_management.enabled = true;
+    moduleConfig.traffic_management.position_dedup_enabled = true;
+    moduleConfig.traffic_management.position_precision_bits = 22;
+    moduleConfig.traffic_management.position_min_interval_secs = 1800;
+    moduleConfig.traffic_management.nodeinfo_direct_response = true;
+    moduleConfig.traffic_management.nodeinfo_direct_response_max_hops = 2;
+    moduleConfig.traffic_management.rate_limit_enabled = true;
+    moduleConfig.traffic_management.rate_limit_window_secs = 300;
+    moduleConfig.traffic_management.rate_limit_max_packets = 30;
+    moduleConfig.traffic_management.drop_unknown_enabled = true;
+    moduleConfig.traffic_management.unknown_packet_threshold = 5;
+    moduleConfig.traffic_management.exhaust_hop_telemetry = true;
+    moduleConfig.traffic_management.exhaust_hop_position = true;
+#endif
+    
     initModuleConfigIntervals();
 }
 
@@ -1372,6 +1389,24 @@ void NodeDB::loadFromDisk()
         }
     }
 
+    if (!moduleConfig.has_traffic_management) {
+        LOG_INFO("Migrating: enable Traffic Management defaults");
+        moduleConfig.has_traffic_management = true;
+        moduleConfig.traffic_management.enabled = true;
+        moduleConfig.traffic_management.position_dedup_enabled = true;
+        moduleConfig.traffic_management.position_precision_bits = 22;
+        moduleConfig.traffic_management.position_min_interval_secs = 900;
+        moduleConfig.traffic_management.nodeinfo_direct_response = true;
+        moduleConfig.traffic_management.rate_limit_enabled = true;
+        moduleConfig.traffic_management.rate_limit_window_secs = 300;
+        moduleConfig.traffic_management.rate_limit_max_packets = 30;
+        moduleConfig.traffic_management.drop_unknown_enabled = true;
+        moduleConfig.traffic_management.unknown_packet_threshold = 5;
+        moduleConfig.traffic_management.exhaust_hop_telemetry = true;
+        moduleConfig.traffic_management.exhaust_hop_position = true;
+        saveToDisk(SEGMENT_MODULECONFIG);
+    }   
+    
     state = loadProto(channelFileName, meshtastic_ChannelFile_size, sizeof(meshtastic_ChannelFile), &meshtastic_ChannelFile_msg,
                       &channelFile);
     if (state != LoadFileResult::LOAD_SUCCESS) {
@@ -1565,6 +1600,7 @@ bool NodeDB::saveToDiskNoRetry(int saveWhat)
         moduleConfig.has_audio = true;
         moduleConfig.has_paxcounter = true;
         moduleConfig.has_statusmessage = true;
+        moduleConfig.has_traffic_management = true;
 
         success &=
             saveProto(moduleConfigFileName, meshtastic_LocalModuleConfig_size, &meshtastic_LocalModuleConfig_msg, &moduleConfig);
