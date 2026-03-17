@@ -928,7 +928,6 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.traffic_management.position_precision_bits = 22;
     moduleConfig.traffic_management.position_min_interval_secs = 1800;
     moduleConfig.traffic_management.nodeinfo_direct_response = true;
-    moduleConfig.traffic_management.nodeinfo_direct_response_max_hops = 2;
     moduleConfig.traffic_management.rate_limit_enabled = true;
     moduleConfig.traffic_management.rate_limit_window_secs = 300;
     moduleConfig.traffic_management.rate_limit_max_packets = 30;
