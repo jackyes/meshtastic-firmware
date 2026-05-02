@@ -92,6 +92,7 @@ class Router : protected concurrency::OSThread, protected PacketHistory
         before us */
     uint32_t rxDupe = 0, txRelayCanceled = 0;
 
+<<<<<<< HEAD
     // Battery level thresholds for traffic management
     static const int BATTERY_CRITICAL_THRESHOLD = 10;  // Below 10%: Survival mode
     static const int BATTERY_LOW_THRESHOLD = 20;       // Below 20%: Restricted mode
@@ -117,6 +118,8 @@ class Router : protected concurrency::OSThread, protected PacketHistory
 
     // pointer to the encrypted packet
     meshtastic_MeshPacket *p_encrypted = nullptr;
+=======
+>>>>>>> upstream/develop
   protected:
     friend class RoutingModule;
 
