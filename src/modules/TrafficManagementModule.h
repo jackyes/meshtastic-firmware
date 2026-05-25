@@ -56,6 +56,9 @@ class TrafficManagementModule : public MeshModule, private concurrency::OSThread
     // Protected so test shims can force epoch rollover behavior.
     void resetEpoch(uint32_t nowMs);
 
+    // Maximum hop_start value allowed when drop_unknown_enabled is active.
+    static constexpr uint8_t MAX_HOP_START_ALLOWED = 5;
+
   private:
     // =========================================================================
     // Unified Cache Entry (10 bytes) - Same for ALL platforms

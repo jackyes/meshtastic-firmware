@@ -987,6 +987,23 @@ void TrafficManagementModule::alterReceived(meshtastic_MeshPacket &mp)
     if (!moduleConfig.has_traffic_management || !moduleConfig.traffic_management.enabled)
         return;
 
+    const auto &cfg = moduleConfig.traffic_management;
+
+    // -------------------------------------------------------------------------
+    // Hop-Start Cap
+    // -------------------------------------------------------------------------
+    // When drop_unknown is enabled, also clamp any inbound packet's hop_start to
+    // MAX_HOP_START_ALLOWED (5). Applies to decoded and undecoded packets from
+    // other nodes. If hop_limit exceeds the capped hop_start it is clamped too,
+    // preserving the hop_start >= hop_limit invariant required by hopsAway math.
+
+    if (cfg.drop_unknown_enabled && !isFromUs(&mp) && mp.hop_start > MAX_HOP_START_ALLOWED) {
+        logAction("cap-hop-start", &mp, "drop-unknown");
+        mp.hop_start = MAX_HOP_START_ALLOWED;
+        if (mp.hop_limit > mp.hop_start)
+            mp.hop_limit = mp.hop_start;
+    }
+
     if (mp.which_payload_variant != meshtastic_MeshPacket_decoded_tag)
         return;
 
@@ -999,7 +1016,6 @@ void TrafficManagementModule::alterReceived(meshtastic_MeshPacket &mp)
     // For relayed telemetry or position broadcasts from other nodes, optionally
     // set hop_limit=0 so they don't propagate further through the mesh.
 
-    const auto &cfg = moduleConfig.traffic_management;
     const bool isTelemetry = mp.decoded.portnum == meshtastic_PortNum_TELEMETRY_APP;
     const bool isPosition = mp.decoded.portnum == meshtastic_PortNum_POSITION_APP;
     // Only exhaust telemetry hops when channel is actually congested, mirroring the same
