@@ -1018,11 +1018,12 @@ void TrafficManagementModule::alterReceived(meshtastic_MeshPacket &mp)
 
     const bool isTelemetry = mp.decoded.portnum == meshtastic_PortNum_TELEMETRY_APP;
     const bool isPosition = mp.decoded.portnum == meshtastic_PortNum_POSITION_APP;
-    // Only exhaust telemetry hops when channel is actually congested, mirroring the same
-    // airtime checks that gate self-generated telemetry in the telemetry modules.
-    const bool channelBusy = airTime && (!airTime->isTxAllowedChannelUtil(true) || !airTime->isTxAllowedAirUtil());
+    // Exhaust telemetry hops unconditionally when the feature flag is set, mirroring
+    // the behavior of exhaust_hop_position. Previously this was gated on a channelBusy
+    // airtime check, which on lightly-loaded meshes (typical for nrf52 builds) almost
+    // never triggered, leaving relayed telemetry to propagate normally despite the flag.
     const bool shouldExhaust =
-        ((channelBusy && isTelemetry && cfg.exhaust_hop_telemetry) || (isPosition && cfg.exhaust_hop_position));
+        ((isTelemetry && cfg.exhaust_hop_telemetry) || (isPosition && cfg.exhaust_hop_position));
 
     if (!shouldExhaust || !isBroadcast(mp.to))
         return;
