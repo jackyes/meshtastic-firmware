@@ -1084,19 +1084,32 @@ readPowerStatus();
     // ==========================================
     initHysteresis(); // Initialize nRF52 memory if necessary
 
-    // Skip solar hysteresis entirely when USB power is present, or when no battery
-    // hardware was detected. On USB-only builds (no LiPo + no fuel gauge on the I2C
-    // bus) the battery reading is permanently 0%, which previously triggered an
-    // endless 3s-sleep boot loop on every power-up.
+    // Skip solar hysteresis unless ALL of the following are true:
+    //  - the user has explicitly opted into power-saving mode via config,
+    //  - no USB power is currently detected,
+    //  - battery hardware is detected AND reports a strictly positive percent.
+    //
+    // A reading of exactly 0% is the sentinel returned when there is no real fuel
+    // gauge on the bus (e.g. seeed-xiao-s3 USB-only builds): isBatteryConnect()
+    // returns true from a stub/ADC default, isVbusIn() returns false because no
+    // PMIC is wired to report it, and the percent reads as a permanent 0.
+    // Without these gates the hysteresis would loop the device into 3s-deep-sleep
+    // forever on every boot.
+    const bool wantsPowerSaving = config.power.is_power_saving;
     const bool hasUsb = powerStatus && powerStatus->getHasUSB();
     const bool hasBatteryHw = powerStatus && powerStatus->getHasBattery();
-    if (hasUsb || !hasBatteryHw) {
+    const int batteryPercentNow = batteryLevel ? batteryLevel->getBatteryPercent() : -1;
+    const bool batteryReadingValid = batteryPercentNow > 0;
+    const bool hysteresisEligible = wantsPowerSaving && !hasUsb && hasBatteryHw && batteryReadingValid;
+
+    if (!hysteresisEligible) {
         if (hys_active) {
-            LOG_INFO("SOLAR HYSTERESIS: USB present or no battery hardware -- clearing hys_active.");
+            LOG_INFO("SOLAR HYSTERESIS: condition no longer met (power_saving=%d usb=%d batt_hw=%d pct=%d) -- clearing hys_active.",
+                     wantsPowerSaving, hasUsb, hasBatteryHw, batteryPercentNow);
             hys_active = false;
         }
     } else if (batteryLevel) {
-        int batteryPercent = batteryLevel->getBatteryPercent();
+        int batteryPercent = batteryPercentNow;
 
         // Avoid invalid readings (battery disconnected or error)
         if (batteryPercent >= 0) {
