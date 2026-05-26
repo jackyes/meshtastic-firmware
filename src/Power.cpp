@@ -1084,12 +1084,23 @@ readPowerStatus();
     // ==========================================
     initHysteresis(); // Initialize nRF52 memory if necessary
 
-    if (batteryLevel) {
+    // Skip solar hysteresis entirely when USB power is present, or when no battery
+    // hardware was detected. On USB-only builds (no LiPo + no fuel gauge on the I2C
+    // bus) the battery reading is permanently 0%, which previously triggered an
+    // endless 3s-sleep boot loop on every power-up.
+    const bool hasUsb = powerStatus2.getHasUSB();
+    const bool hasBatteryHw = powerStatus2.getHasBattery();
+    if (hasUsb || !hasBatteryHw) {
+        if (hys_active) {
+            LOG_INFO("SOLAR HYSTERESIS: USB present or no battery hardware -- clearing hys_active.");
+            hys_active = false;
+        }
+    } else if (batteryLevel) {
         int batteryPercent = batteryLevel->getBatteryPercent();
 
         // Avoid invalid readings (battery disconnected or error)
         if (batteryPercent >= 0) {
-            
+
             // 1. We are operational, but battery drops below critical limit
             if (!hys_active && batteryPercent < SOLAR_CUTOFF_PERCENT) {
                 LOG_WARN("!!! SOLAR HYSTERESIS !!! Crit Batt (%d%%). ACTIVATING SLEEP.", batteryPercent);
