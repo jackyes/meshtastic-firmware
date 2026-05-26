@@ -1088,8 +1088,8 @@ readPowerStatus();
     // hardware was detected. On USB-only builds (no LiPo + no fuel gauge on the I2C
     // bus) the battery reading is permanently 0%, which previously triggered an
     // endless 3s-sleep boot loop on every power-up.
-    const bool hasUsb = powerStatus2.getHasUSB();
-    const bool hasBatteryHw = powerStatus2.getHasBattery();
+    const bool hasUsb = powerStatus && powerStatus->getHasUSB();
+    const bool hasBatteryHw = powerStatus && powerStatus->getHasBattery();
     if (hasUsb || !hasBatteryHw) {
         if (hys_active) {
             LOG_INFO("SOLAR HYSTERESIS: USB present or no battery hardware -- clearing hys_active.");
