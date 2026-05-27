@@ -104,16 +104,29 @@ static inline int get_max_num_nodes()
 #define MAX_NUM_CHANNELS (member_size(meshtastic_ChannelFile, channels) / member_size(meshtastic_ChannelFile, channels[0]))
 
 // Traffic Management module configuration
-// Enable per-variant by defining HAS_TRAFFIC_MANAGEMENT=1 in variant.h
+// Enabled by default on all platforms. Can be disabled per-variant by defining
+// HAS_TRAFFIC_MANAGEMENT=0 in variant.h, or globally via build flags.
 #ifndef HAS_TRAFFIC_MANAGEMENT
-#define HAS_TRAFFIC_MANAGEMENT 0
+#define HAS_TRAFFIC_MANAGEMENT 1
 #endif
 
-// Cache size for traffic management (number of nodes to track)
-// Can be overridden per-variant based on available memory
+// Cache size for traffic management (number of nodes to track).
+// Sized automatically by platform if not overridden in variant.h.
+//   ESP32/S2/S3/C3 with PSRAM : 2048  (cache lives in PSRAM, effectively free)
+//   ESP32 without PSRAM        : 1024
+//   NRF52                      : 1024  (nrf52840 has 256 KB RAM)
+//   RP2040 / STM32 / others    :  512  (conservative for tighter RAM budgets)
 #ifndef TRAFFIC_MANAGEMENT_CACHE_SIZE
 #if HAS_TRAFFIC_MANAGEMENT
-#define TRAFFIC_MANAGEMENT_CACHE_SIZE 1000
+#if defined(ARCH_ESP32) && defined(BOARD_HAS_PSRAM)
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 2048
+#elif defined(ARCH_ESP32)
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 1024
+#elif defined(ARCH_NRF52)
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 1024
+#else
+#define TRAFFIC_MANAGEMENT_CACHE_SIZE 512
+#endif
 #else
 #define TRAFFIC_MANAGEMENT_CACHE_SIZE 0
 #endif
