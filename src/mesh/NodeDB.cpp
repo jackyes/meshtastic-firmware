@@ -1188,8 +1188,9 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.traffic_management.unknown_packet_threshold = 5;
     moduleConfig.traffic_management.exhaust_hop_telemetry = true;
     moduleConfig.traffic_management.exhaust_hop_position = true;
+    moduleConfig.traffic_management.router_preserve_hops = true;
 #endif
-    
+
     initModuleConfigIntervals();
 }
 
@@ -1885,6 +1886,7 @@ void NodeDB::loadFromDisk()
         moduleConfig.traffic_management.unknown_packet_threshold = 5;
         moduleConfig.traffic_management.exhaust_hop_telemetry = true;
         moduleConfig.traffic_management.exhaust_hop_position = true;
+        moduleConfig.traffic_management.router_preserve_hops = true;
         saveToDisk(SEGMENT_MODULECONFIG);
     }   
     
