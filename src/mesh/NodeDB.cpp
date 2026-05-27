@@ -1179,7 +1179,7 @@ void NodeDB::installDefaultModuleConfig()
     moduleConfig.traffic_management.enabled = true;
     moduleConfig.traffic_management.position_dedup_enabled = true;
     moduleConfig.traffic_management.position_precision_bits = 22;
-    moduleConfig.traffic_management.position_min_interval_secs = 1800;
+    moduleConfig.traffic_management.position_min_interval_secs = 43200;
     moduleConfig.traffic_management.nodeinfo_direct_response = true;
     moduleConfig.traffic_management.rate_limit_enabled = true;
     moduleConfig.traffic_management.rate_limit_window_secs = 300;
@@ -1876,7 +1876,7 @@ void NodeDB::loadFromDisk()
         moduleConfig.traffic_management.enabled = true;
         moduleConfig.traffic_management.position_dedup_enabled = true;
         moduleConfig.traffic_management.position_precision_bits = 22;
-        moduleConfig.traffic_management.position_min_interval_secs = 900;
+        moduleConfig.traffic_management.position_min_interval_secs = 43200;
         moduleConfig.traffic_management.nodeinfo_direct_response = true;
         moduleConfig.traffic_management.rate_limit_enabled = true;
         moduleConfig.traffic_management.rate_limit_window_secs = 300;
