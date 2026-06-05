@@ -110,6 +110,15 @@ static inline int get_max_num_nodes()
 #define HAS_TRAFFIC_MANAGEMENT 1
 #endif
 
+// HopScalingModule - variable hop module: dynamically adjusts broadcast hop_limit based on mesh density
+// Enable per-variant by defining HAS_VARIABLE_HOPS=1 in variant.h
+#ifdef ARCH_STM32WL
+#define HAS_VARIABLE_HOPS 0
+#endif
+#ifndef HAS_VARIABLE_HOPS
+#define HAS_VARIABLE_HOPS 1
+#endif
+
 // Cache size for traffic management (number of nodes to track).
 // Sized automatically by platform if not overridden in variant.h.
 //   ESP32/S2/S3/C3 with PSRAM : 2048  (cache lives in PSRAM, effectively free)
