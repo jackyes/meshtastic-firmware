@@ -616,33 +616,6 @@ void MQTT::publishQueuedMessages()
         const std::unique_ptr<QueueEntry> entry(rawEntry);
         LOG_INFO("publish %s, %u bytes from queue", entry->topic.c_str(), entry->envBytes.size());
         publish(entry->topic.c_str(), entry->envBytes.data(), entry->envBytes.size(), false);
-
-#if !defined(ARCH_NRF52) ||                                                                                                      \
-    defined(NRF52_USE_JSON) // JSON is not supported on nRF52, see issue #2804 ### Fixed by using ArduinoJson ###
-        if (!moduleConfig.mqtt.json_enabled)
-            continue;
-
-        // handle json topic
-        const DecodedServiceEnvelope env(entry->envBytes.data(), entry->envBytes.size());
-        if (!env.validDecode || env.packet == NULL || env.channel_id == NULL)
-            continue;
-
-        auto jsonString = MeshPacketSerializer::JsonSerialize(env.packet);
-        if (jsonString.length() == 0)
-            continue;
-
-        // Generate node ID from nodenum for topic
-        std::string nodeId = nodeDB->getNodeId();
-
-        std::string topicJson;
-        if (env.packet->pki_encrypted) {
-            topicJson = jsonTopic + "PKI/" + nodeId;
-        } else {
-            topicJson = jsonTopic + env.channel_id + "/" + nodeId;
-        }
-        LOG_INFO("JSON publish message to %s, %u bytes: %s", topicJson.c_str(), jsonString.length(), jsonString.c_str());
-        publish(topicJson.c_str(), jsonString.c_str(), false);
-#endif // ARCH_NRF52 NRF52_USE_JSON
     }
 }
 
