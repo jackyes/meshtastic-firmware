@@ -19,6 +19,7 @@
 */
 
 #include "variant.h"
+#include "Arduino.h"
 #include "nrf.h"
 #include "wiring_constants.h"
 #include "wiring_digital.h"
@@ -32,53 +33,29 @@ const uint32_t g_ADigitalPinMap[] = {
 
 void initVariant()
 {
-    pinMode(PIN_BUZZER_VOLTAGE_MULTIPLIER_1, OUTPUT);
-    pinMode(PIN_BUZZER_VOLTAGE_MULTIPLIER_2, OUTPUT);
-    digitalWrite(PIN_BUZZER_VOLTAGE_MULTIPLIER_1, HIGH);
-    digitalWrite(PIN_BUZZER_VOLTAGE_MULTIPLIER_2, HIGH);
+
 }
 
 void variant_shutdown()
 {
-    nrf_gpio_cfg_default(ST7735_CS);
-    nrf_gpio_cfg_default(ST7735_RS);
-    nrf_gpio_cfg_default(ST7735_SDA);
-    nrf_gpio_cfg_default(ST7735_SCK);
-    nrf_gpio_cfg_default(ST7735_RESET);
-    nrf_gpio_cfg_default(ST7735_BL);
-    nrf_gpio_cfg_default(VTFT_CTRL);
-
-    nrf_gpio_cfg_default(PIN_WIRE_SDA);
-    nrf_gpio_cfg_default(PIN_WIRE_SCL);
-
+    nrf_gpio_cfg_default(PIN_GPS_EN);
+    nrf_gpio_cfg_default(PIN_GPS_PPS);
+    nrf_gpio_cfg_default(PIN_GPS_RESET);
+    nrf_gpio_cfg_default(PIN_GPS_STANDBY);
+    nrf_gpio_cfg_default(GPS_RX_PIN);
+    nrf_gpio_cfg_default(GPS_TX_PIN);
+    nrf_gpio_cfg_default(ADC_CTRL);
+    pinMode(LORA_KCT8103L_EN, OUTPUT);
+    digitalWrite(LORA_KCT8103L_EN, LOW);
+    nrf_gpio_cfg_default(LORA_KCT8103L_TX_RX);
+    nrf_gpio_cfg_default(RF_PA_DETECT_PIN);
     nrf_gpio_cfg_default(SX126X_CS);
     nrf_gpio_cfg_default(SX126X_DIO1);
     nrf_gpio_cfg_default(SX126X_BUSY);
     nrf_gpio_cfg_default(SX126X_RESET);
-
     nrf_gpio_cfg_default(PIN_SPI_MISO);
     nrf_gpio_cfg_default(PIN_SPI_MOSI);
     nrf_gpio_cfg_default(PIN_SPI_SCK);
-
-    // nrf_gpio_cfg_default(PIN_SPI1_MISO);// ST7735 doesn't support MISO, so we don't configure it at all
-    nrf_gpio_cfg_default(PIN_SPI1_MOSI);
-    nrf_gpio_cfg_default(PIN_SPI1_SCK);
-
-    nrf_gpio_cfg_default(PIN_GPS_RESET);
-    nrf_gpio_cfg_default(PIN_GPS_EN);
-    nrf_gpio_cfg_default(PIN_GPS_PPS);
-    nrf_gpio_cfg_default(GPS_TX_PIN);
-    nrf_gpio_cfg_default(GPS_RX_PIN);
-
-    nrf_gpio_cfg_default(PIN_BUZZER_VOLTAGE_MULTIPLIER_1);
-    nrf_gpio_cfg_default(PIN_BUZZER_VOLTAGE_MULTIPLIER_2);
-
-    pinMode(PIN_BUZZER, OUTPUT);
-    digitalWrite(PIN_BUZZER, LOW);
-
-    pinMode(PIN_SENSOR_EN, OUTPUT);
-    digitalWrite(PIN_SENSOR_EN, !PIN_SENSOR_EN_ACTIVE); // Turn off sensor power
-
-    pinMode(PIN_LED1, OUTPUT);
-    digitalWrite(PIN_LED1, HIGH);
+    detachInterrupt(PIN_GPS_PPS);
+    detachInterrupt(PIN_BUTTON1);
 }
