@@ -756,14 +756,14 @@ extern "C" {
 #define meshtastic_ModuleConfig_PaxcounterConfig_paxcounter_update_interval_tag 2
 #define meshtastic_ModuleConfig_PaxcounterConfig_wifi_threshold_tag 3
 #define meshtastic_ModuleConfig_PaxcounterConfig_ble_threshold_tag 4
-#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_telemetry_tag 1
-#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_position_tag 2
-#define meshtastic_ModuleConfig_TrafficManagementConfig_router_preserve_hops_tag 3
 #define meshtastic_ModuleConfig_TrafficManagementConfig_position_min_interval_secs_tag 4
 #define meshtastic_ModuleConfig_TrafficManagementConfig_nodeinfo_direct_response_max_hops_tag 6
 #define meshtastic_ModuleConfig_TrafficManagementConfig_rate_limit_window_secs_tag 8
 #define meshtastic_ModuleConfig_TrafficManagementConfig_rate_limit_max_packets_tag 9
 #define meshtastic_ModuleConfig_TrafficManagementConfig_unknown_packet_threshold_tag 11
+#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_telemetry_tag 12
+#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_position_tag 13
+#define meshtastic_ModuleConfig_TrafficManagementConfig_router_preserve_hops_tag 14
 #define meshtastic_ModuleConfig_SerialConfig_enabled_tag 1
 #define meshtastic_ModuleConfig_SerialConfig_echo_tag 2
 #define meshtastic_ModuleConfig_SerialConfig_rxd_tag 3
@@ -978,14 +978,14 @@ X(a, STATIC,   SINGULAR, INT32,    ble_threshold,     4)
 #define meshtastic_ModuleConfig_PaxcounterConfig_DEFAULT NULL
 
 #define meshtastic_ModuleConfig_TrafficManagementConfig_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_telemetry,           1) \
-X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_position,            2) \
-X(a, STATIC,   SINGULAR, BOOL,     router_preserve_hops,            3) \
 X(a, STATIC,   SINGULAR, UINT32,   position_min_interval_secs,      4) \
 X(a, STATIC,   SINGULAR, UINT32,   nodeinfo_direct_response_max_hops, 6) \
 X(a, STATIC,   SINGULAR, UINT32,   rate_limit_window_secs,          8) \
 X(a, STATIC,   SINGULAR, UINT32,   rate_limit_max_packets,          9) \
-X(a, STATIC,   SINGULAR, UINT32,   unknown_packet_threshold,       11)
+X(a, STATIC,   SINGULAR, UINT32,   unknown_packet_threshold,       11) \
+X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_telemetry,          12) \
+X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_position,           13) \
+X(a, STATIC,   SINGULAR, BOOL,     router_preserve_hops,           14)
 #define meshtastic_ModuleConfig_TrafficManagementConfig_CALLBACK NULL
 #define meshtastic_ModuleConfig_TrafficManagementConfig_DEFAULT NULL
 
