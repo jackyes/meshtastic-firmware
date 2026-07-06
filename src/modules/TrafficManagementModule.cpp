@@ -227,9 +227,7 @@ void TrafficManagementModule::resetStats()
 
 void TrafficManagementModule::recordRouterHopPreserved()
 {
-    // router_preserve_hops: not suitable right now - removed from config until
-    // the right heuristic for when to preserve vs. exhaust is clearer.
-    (void)stats.router_hops_preserved;
+    incrementStat(&stats.router_hops_preserved);
 }
 
 void TrafficManagementModule::incrementStat(uint32_t *field)
@@ -802,10 +800,24 @@ void TrafficManagementModule::alterReceived(meshtastic_MeshPacket &mp)
     if (isFromUs(&mp))
         return;
 
-    // exhaust_hop_telemetry / exhaust_hop_position / router_preserve_hops:
-    // not suitable right now - the right heuristics for when to exhaust or
-    // preserve hops need more field data before we expose them as config knobs.
-    // exhaustRequested stays false; perhapsRebroadcast() behaves normally.
+    const auto &cfg = moduleConfig.traffic_management;
+
+    // exhaust_hop_telemetry: when enabled, relayed telemetry broadcasts get
+    // hop_limit=0 on the outgoing copy (one final relay hop, then dead).
+    if (cfg.exhaust_hop_telemetry && mp.decoded.portnum == meshtastic_PortNum_TELEMETRY_APP && isBroadcast(mp.to)) {
+        exhaustRequested = true;
+        exhaustRequestedFrom = getFrom(&mp);
+        exhaustRequestedId = mp.id;
+        incrementStat(&stats.hop_exhausted_packets);
+    }
+
+    // exhaust_hop_position: same for position broadcasts.
+    if (cfg.exhaust_hop_position && mp.decoded.portnum == meshtastic_PortNum_POSITION_APP && isBroadcast(mp.to)) {
+        exhaustRequested = true;
+        exhaustRequestedFrom = getFrom(&mp);
+        exhaustRequestedId = mp.id;
+        incrementStat(&stats.hop_exhausted_packets);
+    }
 
     const bool isPosition = mp.decoded.portnum == meshtastic_PortNum_POSITION_APP;
 

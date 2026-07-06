@@ -251,6 +251,15 @@ typedef struct _meshtastic_ModuleConfig_PaxcounterConfig {
 /* Config for the Traffic Management module.
  Provides packet inspection and traffic shaping to help reduce channel utilization */
 typedef struct _meshtastic_ModuleConfig_TrafficManagementConfig {
+    /* When enabled, relayed telemetry broadcasts get hop_limit=0 on the
+ outgoing copy (one final relay hop, then dead). Default false. */
+    bool exhaust_hop_telemetry;
+    /* When enabled, relayed position broadcasts get hop_limit=0 on the
+ outgoing copy (one final relay hop, then dead). Default false. */
+    bool exhaust_hop_position;
+    /* When enabled, router-to-router forwarding does NOT decrement
+ hop_limit, preserving hops across the router backbone. Default false. */
+    bool router_preserve_hops;
     /* Minimum interval in seconds between position updates from the same node.
  A non-zero value implicitly enables the suppression window; 0 disables it. */
     uint32_t position_min_interval_secs;
@@ -675,7 +684,7 @@ extern "C" {
 #define meshtastic_ModuleConfig_DetectionSensorConfig_init_default {0, 0, 0, 0, "", 0, _meshtastic_ModuleConfig_DetectionSensorConfig_TriggerType_MIN, 0}
 #define meshtastic_ModuleConfig_AudioConfig_init_default {0, 0, _meshtastic_ModuleConfig_AudioConfig_Audio_Baud_MIN, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_PaxcounterConfig_init_default {0, 0, 0, 0}
-#define meshtastic_ModuleConfig_TrafficManagementConfig_init_default {0, 0, 0, 0, 0}
+#define meshtastic_ModuleConfig_TrafficManagementConfig_init_default {0, 0, 0, 0, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_SerialConfig_init_default {0, 0, 0, 0, _meshtastic_ModuleConfig_SerialConfig_Serial_Baud_MIN, 0, _meshtastic_ModuleConfig_SerialConfig_Serial_Mode_MIN, 0}
 #define meshtastic_ModuleConfig_ExternalNotificationConfig_init_default {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_StoreForwardConfig_init_default {0, 0, 0, 0, 0, 0}
@@ -696,7 +705,7 @@ extern "C" {
 #define meshtastic_ModuleConfig_DetectionSensorConfig_init_zero {0, 0, 0, 0, "", 0, _meshtastic_ModuleConfig_DetectionSensorConfig_TriggerType_MIN, 0}
 #define meshtastic_ModuleConfig_AudioConfig_init_zero {0, 0, _meshtastic_ModuleConfig_AudioConfig_Audio_Baud_MIN, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_PaxcounterConfig_init_zero {0, 0, 0, 0}
-#define meshtastic_ModuleConfig_TrafficManagementConfig_init_zero {0, 0, 0, 0, 0}
+#define meshtastic_ModuleConfig_TrafficManagementConfig_init_zero {0, 0, 0, 0, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_SerialConfig_init_zero {0, 0, 0, 0, _meshtastic_ModuleConfig_SerialConfig_Serial_Baud_MIN, 0, _meshtastic_ModuleConfig_SerialConfig_Serial_Mode_MIN, 0}
 #define meshtastic_ModuleConfig_ExternalNotificationConfig_init_zero {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 #define meshtastic_ModuleConfig_StoreForwardConfig_init_zero {0, 0, 0, 0, 0, 0}
@@ -747,6 +756,9 @@ extern "C" {
 #define meshtastic_ModuleConfig_PaxcounterConfig_paxcounter_update_interval_tag 2
 #define meshtastic_ModuleConfig_PaxcounterConfig_wifi_threshold_tag 3
 #define meshtastic_ModuleConfig_PaxcounterConfig_ble_threshold_tag 4
+#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_telemetry_tag 1
+#define meshtastic_ModuleConfig_TrafficManagementConfig_exhaust_hop_position_tag 2
+#define meshtastic_ModuleConfig_TrafficManagementConfig_router_preserve_hops_tag 3
 #define meshtastic_ModuleConfig_TrafficManagementConfig_position_min_interval_secs_tag 4
 #define meshtastic_ModuleConfig_TrafficManagementConfig_nodeinfo_direct_response_max_hops_tag 6
 #define meshtastic_ModuleConfig_TrafficManagementConfig_rate_limit_window_secs_tag 8
@@ -966,11 +978,14 @@ X(a, STATIC,   SINGULAR, INT32,    ble_threshold,     4)
 #define meshtastic_ModuleConfig_PaxcounterConfig_DEFAULT NULL
 
 #define meshtastic_ModuleConfig_TrafficManagementConfig_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, UINT32,   position_min_interval_secs,   4) \
-X(a, STATIC,   SINGULAR, UINT32,   nodeinfo_direct_response_max_hops,   6) \
-X(a, STATIC,   SINGULAR, UINT32,   rate_limit_window_secs,   8) \
-X(a, STATIC,   SINGULAR, UINT32,   rate_limit_max_packets,   9) \
-X(a, STATIC,   SINGULAR, UINT32,   unknown_packet_threshold,  11)
+X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_telemetry,           1) \
+X(a, STATIC,   SINGULAR, BOOL,     exhaust_hop_position,            2) \
+X(a, STATIC,   SINGULAR, BOOL,     router_preserve_hops,            3) \
+X(a, STATIC,   SINGULAR, UINT32,   position_min_interval_secs,      4) \
+X(a, STATIC,   SINGULAR, UINT32,   nodeinfo_direct_response_max_hops, 6) \
+X(a, STATIC,   SINGULAR, UINT32,   rate_limit_window_secs,          8) \
+X(a, STATIC,   SINGULAR, UINT32,   rate_limit_max_packets,          9) \
+X(a, STATIC,   SINGULAR, UINT32,   unknown_packet_threshold,       11)
 #define meshtastic_ModuleConfig_TrafficManagementConfig_CALLBACK NULL
 #define meshtastic_ModuleConfig_TrafficManagementConfig_DEFAULT NULL
 
@@ -1174,7 +1189,7 @@ extern const pb_msgdesc_t meshtastic_RemoteHardwarePin_msg;
 #define meshtastic_ModuleConfig_StoreForwardConfig_size 24
 #define meshtastic_ModuleConfig_TAKConfig_size   4
 #define meshtastic_ModuleConfig_TelemetryConfig_size 50
-#define meshtastic_ModuleConfig_TrafficManagementConfig_size 30
+#define meshtastic_ModuleConfig_TrafficManagementConfig_size 36
 #define meshtastic_ModuleConfig_size             328
 #define meshtastic_RemoteHardwarePin_size        21
 

@@ -1168,9 +1168,8 @@ void NodeDB::initConfigIntervals()
 // Always-on traffic management defaults. Only booleans are written; every
 // numeric field stays 0 and resolves to its default_traffic_mgmt_* macro at
 // use (e.g. position dedup precision/interval), so fork-wide tuning changes
-// take effect without another migration. Rate limiting and the features that
-// exhaust or reshape relayed traffic (exhaust_hop_*, drop_unknown_enabled,
-// nodeinfo_direct_response) stay opt-in.
+// take effect without another migration. Rate limiting, exhaust-hop features,
+// and nodeinfo_direct_response stay opt-in.
 static void installTrafficManagementDefaults(meshtastic_LocalModuleConfig &mc)
 {
     mc.has_traffic_management = true;
@@ -1180,8 +1179,8 @@ static void installTrafficManagementDefaults(meshtastic_LocalModuleConfig &mc)
     // semantics, so each knob is enabled simply by giving it a non-zero value; set any
     // field to 0 at runtime to disable that sub-feature. STM32WL is excluded at compile
     // time (HAS_TRAFFIC_MANAGEMENT=0 in mesh-pb-constants.h).
-    // NOTE: the old exhaust_hop_telemetry/position and router_preserve_hops knobs were
-    // removed from the proto upstream and can no longer be enabled here.
+    // exhaust_hop_telemetry, exhaust_hop_position and router_preserve_hops are opt-in
+    // booleans defaulting to false via the init_zero macro.
     mc.traffic_management.position_min_interval_secs = 43200;    // 12h identical-position dedup window
     mc.traffic_management.nodeinfo_direct_response_max_hops = 2; // serve NodeInfo from cache within 2 hops
     mc.traffic_management.rate_limit_window_secs = 300;          // per-node rate-limit window

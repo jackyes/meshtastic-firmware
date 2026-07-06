@@ -101,12 +101,24 @@ bool Router::shouldDecrementHopLimit(const meshtastic_MeshPacket *p)
         return true;
     }
 
-    // router_preserve_hops: not suitable right now - removed from config until
-    // the right heuristics for when to preserve vs. exhaust hops are established.
-    // #if HAS_TRAFFIC_MANAGEMENT
-    //     if (moduleConfig.has_traffic_management &&
-    //         moduleConfig.traffic_management.router_preserve_hops && ...) { ... }
-    // #endif
+#if HAS_TRAFFIC_MANAGEMENT
+    // router_preserve_hops: blanket preservation when both nodes are routers
+    // and the operator has explicitly opted in via config.
+    if (moduleConfig.has_traffic_management && moduleConfig.traffic_management.router_preserve_hops) {
+        NodeNum resolved = 0;
+        if (nodeDB->resolveUniqueLastByte(p->relay_node, /*requireDirectNeighbor=*/false, &resolved)) {
+            const meshtastic_NodeInfoLite *prevNode = nodeDB->getMeshNode(resolved);
+            if (prevNode && nodeInfoLiteHasUser(prevNode) &&
+                IS_ONE_OF(prevNode->role, meshtastic_Config_DeviceConfig_Role_ROUTER,
+                          meshtastic_Config_DeviceConfig_Role_ROUTER_LATE,
+                          meshtastic_Config_DeviceConfig_Role_CLIENT_BASE)) {
+                if (trafficManagementModule)
+                    trafficManagementModule->recordRouterHopPreserved();
+                return false; // Don't decrement: router-to-router preservation
+            }
+        }
+    }
+#endif
 
     // For subsequent hops, preserve hop_limit only when the previous relay is UNAMBIGUOUSLY a favorite
     // router. The relay_node byte is just the last byte of a 32-bit node number, so on a dense mesh it

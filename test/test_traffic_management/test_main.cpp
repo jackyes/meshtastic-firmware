@@ -733,13 +733,13 @@ static void test_tm_nodeinfo_directResponse_psramMissDoesNotFallbackToNodeDb(voi
 #endif
 
 /**
- * Verify relayed telemetry broadcasts are NOT hop-exhausted.
- * exhaust_hop_telemetry / exhaust_hop_position have been removed from the config
- * as "not suitable right now" - alterReceived must leave hop_limit unchanged.
+ * Verify relayed telemetry broadcasts are hop-exhausted when
+ * exhaust_hop_telemetry is enabled. shouldExhaustHops() returns true
+ * and the hop_exhausted_packets stat is incremented.
  */
-static void test_tm_alterReceived_telemetryBroadcast_hopLimitUnchanged(void)
+static void test_tm_alterReceived_telemetryBroadcast_exhaustsWhenEnabled(void)
 {
-    ScopedBusyAirTime busyChannel; // congestion present but exhaust is disabled
+    moduleConfig.traffic_management.exhaust_hop_telemetry = true;
     TrafficManagementModuleTestShim module;
     meshtastic_MeshPacket packet = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kRemoteNode, NODENUM_BROADCAST);
     packet.hop_start = 5;
@@ -748,10 +748,8 @@ static void test_tm_alterReceived_telemetryBroadcast_hopLimitUnchanged(void)
     module.alterReceived(packet);
     meshtastic_TrafficManagementStats stats = module.getStats();
 
-    TEST_ASSERT_EQUAL_UINT8(3, packet.hop_limit); // unchanged
-    TEST_ASSERT_EQUAL_UINT8(5, packet.hop_start); // unchanged
-    TEST_ASSERT_FALSE(module.shouldExhaustHops(packet));
-    TEST_ASSERT_EQUAL_UINT32(0, stats.hop_exhausted_packets);
+    TEST_ASSERT_TRUE(module.shouldExhaustHops(packet));
+    TEST_ASSERT_EQUAL_UINT32(1, stats.hop_exhausted_packets);
 }
 
 /**
@@ -1025,11 +1023,12 @@ static void test_tm_unknownPackets_thresholdAbove255_clamps(void)
 }
 
 /**
- * Verify relayed position broadcasts are NOT hop-exhausted.
- * exhaust_hop_position has been removed - alterReceived must leave hop_limit unchanged.
+ * Verify relayed position broadcasts are hop-exhausted when
+ * exhaust_hop_position is enabled.
  */
-static void test_tm_alterReceived_positionBroadcast_hopLimitUnchanged(void)
+static void test_tm_alterReceived_positionBroadcast_exhaustsWhenEnabled(void)
 {
+    moduleConfig.traffic_management.exhaust_hop_position = true;
     TrafficManagementModuleTestShim module;
     meshtastic_MeshPacket packet = makePositionPacket(kRemoteNode, 374221234, -1220845678, NODENUM_BROADCAST);
     packet.hop_start = 5;
@@ -1038,10 +1037,8 @@ static void test_tm_alterReceived_positionBroadcast_hopLimitUnchanged(void)
     module.alterReceived(packet);
     meshtastic_TrafficManagementStats stats = module.getStats();
 
-    TEST_ASSERT_EQUAL_UINT8(2, packet.hop_limit); // unchanged
-    TEST_ASSERT_EQUAL_UINT8(5, packet.hop_start); // unchanged
-    TEST_ASSERT_FALSE(module.shouldExhaustHops(packet));
-    TEST_ASSERT_EQUAL_UINT32(0, stats.hop_exhausted_packets);
+    TEST_ASSERT_TRUE(module.shouldExhaustHops(packet));
+    TEST_ASSERT_EQUAL_UINT32(1, stats.hop_exhausted_packets);
 }
 /**
  * Verify alterReceived ignores undecoded/encrypted packets.
@@ -1064,36 +1061,39 @@ static void test_tm_alterReceived_skipsUndecodedPackets(void)
 }
 
 /**
- * Verify shouldExhaustHops() always returns false - exhaust_hop_* features are
- * removed, so the exhaustRequested flag is never set.
- * Guards against accidental re-enablement without updating the flag logic.
+ * Verify shouldExhaustHops() returns true when exhaust_hop_telemetry is enabled
+ * and a matching telemetry broadcast is received. Text messages should NOT set
+ * the exhaust flag even when the config is enabled.
  */
-static void test_tm_alterReceived_exhaustFlagAlwaysFalse(void)
+static void test_tm_alterReceived_exhaustFlag_setWhenConfigEnabled(void)
 {
+    moduleConfig.traffic_management.exhaust_hop_telemetry = true;
     TrafficManagementModuleTestShim module;
 
     meshtastic_MeshPacket telemetry = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kRemoteNode, NODENUM_BROADCAST);
     telemetry.hop_start = 5;
     telemetry.hop_limit = 3;
     module.alterReceived(telemetry);
-    TEST_ASSERT_FALSE(module.shouldExhaustHops(telemetry));
+    TEST_ASSERT_TRUE(module.shouldExhaustHops(telemetry));
 
+    // Text messages should not trigger exhaust even with config enabled
     meshtastic_MeshPacket text = makeDecodedPacket(meshtastic_PortNum_TEXT_MESSAGE_APP, kRemoteNode);
     ProcessMessage result = module.handleReceived(text);
     meshtastic_TrafficManagementStats stats = module.getStats();
 
     TEST_ASSERT_EQUAL_INT(static_cast<int>(ProcessMessage::CONTINUE), static_cast<int>(result));
-    TEST_ASSERT_FALSE(module.shouldExhaustHops(telemetry));
-    TEST_ASSERT_EQUAL_UINT32(0, stats.hop_exhausted_packets);
+    TEST_ASSERT_FALSE(module.shouldExhaustHops(text));
+    TEST_ASSERT_EQUAL_UINT32(1, stats.hop_exhausted_packets); // only the telemetry packet
 }
 
 /**
- * Verify shouldExhaustHops() returns false for any packet regardless of from/id.
- * Since exhaust is removed, the from+id scope check is moot - this guards that
- * the always-false invariant holds across multiple distinct packets.
+ * Verify shouldExhaustHops() is scoped to the specific packet (from + id).
+ * When exhaust_hop_telemetry is enabled, only the matching packet returns true;
+ * a packet from a different sender or with a different id returns false.
  */
-static void test_tm_alterReceived_exhaustFlag_isPacketScoped(void)
+static void test_tm_alterReceived_exhaustFlag_packetScopedWithConfig(void)
 {
+    moduleConfig.traffic_management.exhaust_hop_telemetry = true;
     TrafficManagementModuleTestShim module;
 
     meshtastic_MeshPacket p1 = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kRemoteNode, NODENUM_BROADCAST);
@@ -1102,13 +1102,53 @@ static void test_tm_alterReceived_exhaustFlag_isPacketScoped(void)
     p1.hop_limit = 3;
     module.alterReceived(p1);
 
+    // p1 should match (same from + id as alterReceived)
+    TEST_ASSERT_TRUE(module.shouldExhaustHops(p1));
+
+    // p2 has different from + id, should NOT match
     meshtastic_MeshPacket p2 = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kTargetNode, NODENUM_BROADCAST);
     p2.id = 0x2020;
     p2.hop_start = 4;
     p2.hop_limit = 0;
 
-    TEST_ASSERT_FALSE(module.shouldExhaustHops(p1));
     TEST_ASSERT_FALSE(module.shouldExhaustHops(p2));
+}
+
+/**
+ * Verify exhaust is NOT applied when config defaults are in effect (all false).
+ * This guards the opt-in semantics: disabled by default, enabled explicitly.
+ */
+static void test_tm_alterReceived_exhaustNotApplied_whenConfigDisabled(void)
+{
+    TrafficManagementModuleTestShim module;
+    meshtastic_MeshPacket telemetry = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kRemoteNode, NODENUM_BROADCAST);
+    telemetry.hop_start = 5;
+    telemetry.hop_limit = 3;
+
+    module.alterReceived(telemetry);
+    meshtastic_TrafficManagementStats stats = module.getStats();
+
+    TEST_ASSERT_FALSE(module.shouldExhaustHops(telemetry));
+    TEST_ASSERT_EQUAL_UINT32(0, stats.hop_exhausted_packets);
+}
+
+/**
+ * Verify exhaust is NOT applied to unicast packets even when enabled.
+ * Exhaust should only affect broadcast (mesh-wide) traffic.
+ */
+static void test_tm_alterReceived_exhaustNotApplied_onUnicast(void)
+{
+    moduleConfig.traffic_management.exhaust_hop_telemetry = true;
+    TrafficManagementModuleTestShim module;
+    meshtastic_MeshPacket unicast = makeDecodedPacket(meshtastic_PortNum_TELEMETRY_APP, kRemoteNode, kTargetNode);
+    unicast.hop_start = 5;
+    unicast.hop_limit = 3;
+
+    module.alterReceived(unicast);
+    meshtastic_TrafficManagementStats stats = module.getStats();
+
+    TEST_ASSERT_FALSE(module.shouldExhaustHops(unicast));
+    TEST_ASSERT_EQUAL_UINT32(0, stats.hop_exhausted_packets);
 }
 
 /**
@@ -1636,7 +1676,7 @@ TM_TEST_ENTRY void setup()
     RUN_TEST(test_tm_nodeinfo_directResponse_psramCacheRespondsAndPreservesBitfield);
     RUN_TEST(test_tm_nodeinfo_directResponse_psramMissDoesNotFallbackToNodeDb);
 #endif
-    RUN_TEST(test_tm_alterReceived_telemetryBroadcast_hopLimitUnchanged);
+    RUN_TEST(test_tm_alterReceived_telemetryBroadcast_exhaustsWhenEnabled);
     RUN_TEST(test_tm_alterReceived_skipsLocalAndUnicast);
     RUN_TEST(test_tm_positionDedup_allowsDuplicateAfterIntervalExpires);
     RUN_TEST(test_tm_positionDedup_intervalZero_neverDrops);
@@ -1648,10 +1688,12 @@ TM_TEST_ENTRY void setup()
     RUN_TEST(test_tm_rateLimit_resetsAfterWindowExpires);
     RUN_TEST(test_tm_unknownPackets_resetAfterWindowExpires);
     RUN_TEST(test_tm_unknownPackets_thresholdAbove255_clamps);
-    RUN_TEST(test_tm_alterReceived_positionBroadcast_hopLimitUnchanged);
+    RUN_TEST(test_tm_alterReceived_positionBroadcast_exhaustsWhenEnabled);
     RUN_TEST(test_tm_alterReceived_skipsUndecodedPackets);
-    RUN_TEST(test_tm_alterReceived_exhaustFlagAlwaysFalse);
-    RUN_TEST(test_tm_alterReceived_exhaustFlag_isPacketScoped);
+    RUN_TEST(test_tm_alterReceived_exhaustFlag_setWhenConfigEnabled);
+    RUN_TEST(test_tm_alterReceived_exhaustFlag_packetScopedWithConfig);
+    RUN_TEST(test_tm_alterReceived_exhaustNotApplied_whenConfigDisabled);
+    RUN_TEST(test_tm_alterReceived_exhaustNotApplied_onUnicast);
     RUN_TEST(test_tm_runOnce_disabledReturnsMaxInterval);
     RUN_TEST(test_tm_runOnce_enabledReturnsMaintenanceInterval);
     RUN_TEST(test_tm_nextHop_setAndGetRoundTrip);
