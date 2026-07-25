@@ -164,6 +164,9 @@ class RadioInterface
         sleep();
     }
 
+    /// Undo disable(). The caller is responsible for putting the radio back into receive.
+    void enable() { disabled = false; }
+
     /**
      * Send a packet (possibly by enquing in a private fifo).  This routine will
      * later free() the packet to pool.  This routine is not allowed to stall.

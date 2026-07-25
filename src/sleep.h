@@ -6,6 +6,15 @@
 
 void doDeepSleep(uint32_t msecToWake, bool skipPreflight, bool skipSaveNodeDb), cpuDeepSleep(uint32_t msecToWake);
 
+/** True if cpuDeepSleep(msecToWake) can bring the CPU back on its own.
+ *
+ * On most architectures deep sleep is timer-backed, so this is always true. nRF52 System OFF has no
+ * timer: it only resumes on LPCOMP ANADETECT, which not every variant wires up. Callers that would
+ * otherwise leave an unattended node unrecoverable (e.g. a solar node on a pole) must check this
+ * first and degrade instead of sleeping.
+ */
+bool cpuDeepSleepCanAutoWake();
+
 #ifdef ARCH_ESP32
 #include "esp_sleep.h"
 esp_sleep_wakeup_cause_t doLightSleep(uint64_t msecToWake);

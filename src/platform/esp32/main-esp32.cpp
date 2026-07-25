@@ -317,6 +317,11 @@ void esp32Loop()
     // radio.radioIf.canSleep();
 }
 
+bool cpuDeepSleepCanAutoWake()
+{
+    return true; // esp_sleep_enable_timer_wakeup() below always arms a timer
+}
+
 void cpuDeepSleep(uint32_t msecToWake)
 {
     /*

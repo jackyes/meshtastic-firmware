@@ -161,6 +161,14 @@ int printf(const char *fmt, ...)
 #endif
 
 // ── Deep sleep ────────────────────────────────────────────────────────────
+bool cpuDeepSleepCanAutoWake()
+{
+    // The timed branch below is delay()+NVIC_SystemReset(), a busy wait rather than a low-power
+    // state, so it saves nothing for a caller trying to conserve charge. Report no auto-wake until
+    // the Zephyr pm_system_suspend() TODO lands.
+    return false;
+}
+
 void cpuDeepSleep(uint32_t msecToWake)
 {
 #if HAS_WIRE

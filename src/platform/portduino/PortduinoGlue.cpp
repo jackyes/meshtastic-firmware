@@ -76,6 +76,11 @@ void setBluetoothEnable(bool enable)
     // not needed
 }
 
+bool cpuDeepSleepCanAutoWake()
+{
+    return false; // cpuDeepSleep() is not implemented here, so nothing sleeps and nothing wakes
+}
+
 void cpuDeepSleep(uint32_t msecs)
 {
     notImplemented("cpuDeepSleep");

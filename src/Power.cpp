@@ -22,10 +22,12 @@
 #include "buzz/buzz.h"
 #include "configuration.h"
 #include "main.h"
+#include "mesh/RadioLibInterface.h"
 #include "meshUtils.h"
 #include "power/PowerHAL.h"
 #include "power/SGM41562.h"
 #include "sleep.h"
+#include "target_specific.h"
 #ifdef ARCH_ESP32
 // #include <driver/adc.h>
 #include <esp_adc/adc_cali.h>
@@ -286,8 +288,17 @@ bool pmu_irq = false;
 // ==========================================
 
 // PERCENTAGE THRESHOLDS (Modifiable) - More compatible with different battery types
-#define SOLAR_CUTOFF_PERCENT 10  // Below 10%: shut everything down
-#define SOLAR_RESUME_PERCENT 40  // Do not restart until this level is reached
+#define SOLAR_CUTOFF_PERCENT 10 // Below 10%: shut everything down
+#define SOLAR_RESUME_PERCENT 40 // Do not restart until this level is reached
+#define SOLAR_SLEEP_SECS 3600   // How long to stay down before re-checking the battery
+// Consecutive sub-threshold readings required before acting. runOnce() ticks every 20s, so this is
+// about a minute of sustained low battery. A single reading is not enough: the cell sags under LoRa
+// TX current, and a healthy pack can momentarily read below the cutoff mid-transmission.
+#define SOLAR_CONFIRM_COUNT 3
+
+// Deliberately not config.power.sds_secs: default_sds_secs is IF_ROUTER(ONE_DAY, UINT32_MAX), which
+// secondsToMsClamped() saturates to INT32_MAX ms (~24.8 days). For a non-router solar node that
+// means "never retry" rather than "check again in an hour", so we carry our own duration.
 
 // PERSISTENT MEMORY MANAGEMENT
 #if defined(ARCH_ESP32)
@@ -1115,6 +1126,60 @@ void Power::readPowerStatus()
     }
 }
 
+/**
+ * Stop drawing what we can without going down, for boards that have no way to wake themselves.
+ *
+ * This saves much less than System OFF - the CPU and its peripherals stay up - but the node remains
+ * reachable over serial and recovers on its own once the panel refills the cell. On a mast that
+ * beats a device that cannot be restarted without climbing up to it.
+ */
+void Power::solarDegradeEnter()
+{
+    if (solar_degraded)
+        return;
+
+    solar_degraded = true;
+    LOG_WARN("SOLAR: flat, no wake source -- radio off until %d%%", SOLAR_RESUME_PERCENT);
+
+    setBluetoothEnable(false);
+    // disable() both parks the radio and blocks send(), so modules cannot wake it back up for TX.
+    // Qualified because OSThread (the other base of RadioLibInterface) also declares disable().
+    if (RadioLibInterface::instance)
+        RadioLibInterface::instance->RadioInterface::disable();
+
+#ifdef PIN_LED1
+    digitalWrite(PIN_LED1, 0);
+#endif
+}
+
+void Power::solarDegradeExit()
+{
+    if (!solar_degraded)
+        return;
+
+    solar_degraded = false;
+    LOG_INFO("SOLAR: recovered, radio back up");
+
+    if (RadioLibInterface::instance) {
+        RadioLibInterface::instance->RadioInterface::enable();
+        RadioLibInterface::instance->startReceive();
+    }
+}
+
+void Power::solarEnterCutoff(int batteryPercent)
+{
+    if (cpuDeepSleepCanAutoWake()) {
+        LOG_INFO("SOLAR: %d%% < %d%%, sleep %ds", batteryPercent, SOLAR_RESUME_PERCENT, SOLAR_SLEEP_SECS);
+        // Does not return on nRF52 (System OFF), and restarts the system on ESP32. Nothing after
+        // this is reachable on those platforms, so there is no fallback return value to invent.
+        doDeepSleep(SOLAR_SLEEP_SECS * 1000UL, true, true);
+    } else {
+        // Logs once on the transition; subsequent calls are no-ops, so this can be called every
+        // tick without flooding the log.
+        solarDegradeEnter();
+    }
+}
+
 int32_t Power::runOnce()
 {
 readPowerStatus();
@@ -1133,8 +1198,7 @@ readPowerStatus();
     // gauge on the bus (e.g. seeed-xiao-s3 USB-only builds): isBatteryConnect()
     // returns true from a stub/ADC default, isVbusIn() returns false because no
     // PMIC is wired to report it, and the percent reads as a permanent 0.
-    // Without these gates the hysteresis would loop the device into 3s-deep-sleep
-    // forever on every boot.
+    // Without these gates the hysteresis would trip on every boot.
     const bool wantsPowerSaving = config.power.is_power_saving;
     const bool hasUsb = powerStatus && powerStatus->getHasUSB();
     const bool hasBatteryHw = powerStatus && powerStatus->getHasBattery();
@@ -1143,50 +1207,50 @@ readPowerStatus();
     const bool hysteresisEligible = wantsPowerSaving && !hasUsb && hasBatteryHw && batteryReadingValid;
 
     if (!hysteresisEligible) {
+        solar_low_counter = 0;
         if (hys_active) {
-            LOG_INFO("SOLAR HYSTERESIS: condition no longer met (power_saving=%d usb=%d batt_hw=%d pct=%d) -- clearing hys_active.",
-                     wantsPowerSaving, hasUsb, hasBatteryHw, batteryPercentNow);
+            LOG_INFO("SOLAR: ineligible (saving=%d usb=%d hw=%d pct=%d), clearing", wantsPowerSaving, hasUsb, hasBatteryHw,
+                     batteryPercentNow);
             hys_active = false;
         }
-    } else if (batteryLevel) {
-        int batteryPercent = batteryPercentNow;
+        solarDegradeExit();
+    } else if (RadioLibInterface::instance && RadioLibInterface::instance->isSending()) {
+        // Mid-transmission the cell sags under TX current and reads far below its resting charge.
+        // Neither count nor decide on that sample - just wait for the next tick.
+    } else if (batteryPercentNow < SOLAR_CUTOFF_PERCENT) {
+        // The debounce only guards the way *in*. Deciding to shut a healthy node down is the
+        // dangerous direction, so that needs several agreeing readings. Once we are already in
+        // cutoff the safe default flips: going back to sleep costs at most one wasted hour, while
+        // staying awake to re-confirm burns the very charge we are trying to save. There is also no
+        // TX in flight right after a wake, so the sag this debounce exists for cannot occur.
+        const uint8_t confirmsNeeded = hys_active ? 1 : SOLAR_CONFIRM_COUNT;
 
-        // Avoid invalid readings (battery disconnected or error)
-        if (batteryPercent >= 0) {
+        if (solar_low_counter < confirmsNeeded)
+            solar_low_counter++;
 
-            // 1. We are operational, but battery drops below critical limit
-            if (!hys_active && batteryPercent < SOLAR_CUTOFF_PERCENT) {
-                LOG_WARN("!!! SOLAR HYSTERESIS !!! Crit Batt (%d%%). ACTIVATING SLEEP.", batteryPercent);
+        if (solar_low_counter >= confirmsNeeded) {
+            if (!hys_active) {
+                LOG_WARN("SOLAR: crit batt %d%% x%d, cutting off", batteryPercentNow, SOLAR_CONFIRM_COUNT);
                 hys_active = true;
-                
-                // Force a deep sleep of 1 hour (3600 sec)
-                // On ESP32 this restarts the system in 1 hour.
-                // On nRF52 this pauses execution.
-                doDeepSleep(3600, true, true);
-                return 3600 * 1000; // If doDeepSleep returns (nRF), tell the system to wait
             }
+            solarEnterCutoff(batteryPercentNow);
+        }
+    } else {
+        solar_low_counter = 0;
 
-            // 2. We are in "Hysteresis" mode (Charge recovery)
-            if (hys_active) {
-                if (batteryPercent >= SOLAR_RESUME_PERCENT) {
-                    // Battery charged! Back to operational.
-                    LOG_INFO("!!! SOLAR HYSTERESIS !!! Batt recovered (%d%%). RESUMING OPERATIONS.", batteryPercent);
-                    hys_active = false;
-                } else {
-                    // Still discharged. Go back to sleep immediately.
-                    LOG_INFO("SOLAR HYSTERESIS: Charging... (%d%% / Target %d%%). Sleeping...", batteryPercent, SOLAR_RESUME_PERCENT);
-                    
-                    // Turn off LEDs if on
-                    #ifdef PIN_LED1
-                    digitalWrite(PIN_LED1, 0);
-                    #endif
-
-                    doDeepSleep(3600, true, true); // Sleep for another hour
-                    return 3600 * 1000;
-                }
-            }
+        // Above the cutoff but not yet recovered: we woke early (or never slept), so go back down.
+        if (hys_active && batteryPercentNow < SOLAR_RESUME_PERCENT) {
+            solarEnterCutoff(batteryPercentNow);
+        } else if (hys_active) {
+            LOG_INFO("!!! SOLAR HYSTERESIS !!! Batt recovered (%d%%). RESUMING OPERATIONS.", batteryPercentNow);
+            hys_active = false;
+            solarDegradeExit();
         }
     }
+
+    // Note: no early return while degraded. runOnce() already ticks every 20s, which is often
+    // enough to notice the panel refilling, and falling through keeps the PMU IRQ poll below alive
+    // so a USB plug-in is still detected.
     // ==========================================
     // [END PATCH] LOGIC
     // ==========================================

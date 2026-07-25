@@ -128,8 +128,19 @@ class Power : public concurrency::OSThread
   private:
     void shutdown();
     void reboot();
+    /// Battery is flat and confirmed: sleep it off, or degrade in place if this board cannot wake itself.
+    void solarEnterCutoff(int batteryPercent);
+    void solarDegradeEnter();
+    void solarDegradeExit();
     // open circuit voltage lookup table
     uint8_t low_voltage_counter;
+    // Consecutive readings below SOLAR_CUTOFF_PERCENT. Deliberately separate from
+    // low_voltage_counter: that one drives isLowBattery() and EVENT_LOW_BATTERY, and must not trip
+    // at the (much higher) solar cutoff or the two low-battery paths fight each other.
+    uint8_t solar_low_counter = 0;
+    // True while we are riding out a flat battery without sleeping, because this board has no way
+    // to wake itself back up. Not persisted: the CPU stays running, so nothing resets it.
+    bool solar_degraded = false;
     uint32_t lastLogTime = 0;
 
 #ifdef ARCH_ESP32

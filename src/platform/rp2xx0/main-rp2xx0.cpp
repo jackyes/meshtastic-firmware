@@ -38,6 +38,11 @@ void debug_date(datetime_t t)
     uart_default_tx_wait_blocking();
 }
 
+bool cpuDeepSleepCanAutoWake()
+{
+    return true; // the RTC alarm below wakes us
+}
+
 void cpuDeepSleep(uint32_t msecs)
 {
 
@@ -70,6 +75,11 @@ void cpuDeepSleep(uint32_t msecs)
 }
 
 #else
+bool cpuDeepSleepCanAutoWake()
+{
+    return false; // xosc_dormant() below never returns and nothing re-arms the clock
+}
+
 void cpuDeepSleep(uint32_t msecs)
 {
     /* Set RP2040 in dormant mode. Will not wake up. */

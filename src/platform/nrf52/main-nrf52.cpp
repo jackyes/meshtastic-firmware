@@ -449,6 +449,24 @@ void nrf52Setup()
     assert(r == NRFX_SUCCESS);
 }
 
+bool cpuDeepSleepCanAutoWake()
+{
+    // Sleepy roles take the delay()+NVIC_SystemReset() branch below instead of System OFF. That is a
+    // busy wait, not a low power state, and it reboots afterwards - useless as a "sleep until the
+    // battery recovers" mechanism, so report it as no auto-wake.
+    if (IS_ONE_OF(config.device.role, meshtastic_Config_DeviceConfig_Role_TRACKER,
+                  meshtastic_Config_DeviceConfig_Role_TAK_TRACKER, meshtastic_Config_DeviceConfig_Role_SENSOR) &&
+        config.power.is_power_saving)
+        return false;
+
+#ifdef BATTERY_LPCOMP_INPUT
+    // System OFF only resumes on an LPCOMP rising edge, and the variant may still veto it.
+    return variant_enableBatteryLpcompWake();
+#else
+    return false;
+#endif
+}
+
 void cpuDeepSleep(uint32_t msecToWake)
 {
     // FIXME, configure RTC or button press to wake us

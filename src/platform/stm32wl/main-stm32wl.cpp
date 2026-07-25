@@ -140,6 +140,15 @@ bool stm32wlRtcAvailable()
 void stm32wlSetup() {}
 #endif
 
+bool cpuDeepSleepCanAutoWake()
+{
+#if HAS_LSE
+    return true; // LowPower.shutdown(msec) resumes through an MCU reset
+#else
+    return false; // without an LSE cpuDeepSleep() is a no-op, so it can neither sleep nor wake
+#endif
+}
+
 void cpuDeepSleep(uint32_t msecToWake)
 {
 #if HAS_LSE
