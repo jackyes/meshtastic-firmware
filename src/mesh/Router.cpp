@@ -16,6 +16,7 @@
 #include <pb_decode.h>
 #include <pb_encode.h>
 #if HAS_TRAFFIC_MANAGEMENT
+#include "modules/TrafficManagementModule.h"
 #endif
 #if HAS_VARIABLE_HOPS
 #include "modules/HopScalingModule.h"
