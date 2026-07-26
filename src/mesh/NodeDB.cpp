@@ -3014,6 +3014,7 @@ bool NodeDB::saveToDiskNoRetry(int saveWhat)
         moduleConfig.has_audio = true;
         moduleConfig.has_paxcounter = true;
         moduleConfig.has_statusmessage = true;
+        moduleConfig.has_tak = true;
         moduleConfig.has_traffic_management = true;
 #if !MESHTASTIC_EXCLUDE_BEACON
         moduleConfig.has_mesh_beacon = true;
